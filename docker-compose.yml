@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # SERVICE 1: The Database
+  db:
+    image: postgres:15-alpine
+    container_name: poker_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: poker_stats
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data # Persist data
+    networks:
+      - poker-net
+
+  # SERVICE 2: The Message Queue
+  redis:
+    image: redis:7-alpine
+    container_name: poker_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - poker-net
+
+  # SERVICE 3: The API (Go)
+  api:
+    build: ./api
+    container_name: poker_api
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      - redis
+      - db
+    networks:
+      - poker-net
+
+  # SERVICE 4: The Worker (Python)
+  worker:
+    build: ./worker
+    environment:
+      - REDIS_ADDR=redis:6379
+      - DB_ADDR=db:5432
+    depends_on:
+      - redis
+      - db
+    deploy:
+      replicas: 2
+    networks:
+      - poker-net
+
+networks:
+  poker-net:
+    driver: bridge

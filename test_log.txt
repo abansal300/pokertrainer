@@ -1,0 +1,13 @@
+PokerStars Hand #123456789: Hold'em No Limit ($1/$2 USD)
+Seat 2: Hero ($200)
+*** HOLE CARDS ***
+Dealt to Hero [Ah Kd]
+*** SUMMARY ***
+Board [7c 2d Js 9h 5s]
+
+PokerStars Hand #123456790: Hold'em No Limit ($1/$2 USD)
+Seat 1: Hero ($194)
+*** HOLE CARDS ***
+Dealt to Hero [Ts Tc]
+*** SUMMARY ***
+Board [Qh 8h 5d Ad 3c]
