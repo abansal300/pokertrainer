@@ -1,19 +1,20 @@
 services:
-  # 1. THE REDIS SERVICE
+  # 1. THE REDIS SERVICE (The Queue and Cache)
   - type: redis
     name: poker-redis
-    region: oregon
-    plan: free
-    ipAllowList: []
+    region: oregon # Choose a region near you (e.g., oregon, ohio, frankfurt)
+    plan: free # Free tier plan
+    ipAllowList: [] # Only allow internal connections
 
-  # 2. THE API SERVICE (Flask)
+  # 2. THE API SERVICE (Flask Ingestion Gateway)
   - type: web
     name: poker-api
     env: docker
     region: oregon
     plan: free
-    rootDir: ./api 
+    rootDir: ./api # Points to the folder containing api/Dockerfile
     envVars:
+      # Inject the Redis connection string into the API service
       - key: REDIS_URL
         fromService:
           type: redis
@@ -22,14 +23,15 @@ services:
       - key: PYTHONUNBUFFERED
         value: 1
 
-  # 3. THE WORKER SERVICE (Python)
+  # 3. THE WORKER SERVICE (Python Monte Carlo Solver)
   - type: worker
     name: poker-worker
     env: docker
     region: oregon
     plan: free
-    rootDir: ./worker
+    rootDir: ./worker # Points to the folder containing worker/Dockerfile
     envVars:
+      # Inject the Redis connection string into the Worker service
       - key: REDIS_URL
         fromService:
           type: redis
@@ -38,16 +40,17 @@ services:
       - key: PYTHONUNBUFFERED
         value: 1
 
-  # 4. THE FRONTEND SERVICE (React)
+  # 4. THE FRONTEND SERVICE (React Dashboard)
   - type: web
     name: poker-frontend
     env: docker
     region: oregon
     plan: free
-    rootDir: ./frontend
+    rootDir: ./frontend # Points to the folder containing frontend/Dockerfile
     envVars:
+      # Fix: Inject the API's public hostname (e.g., poker-api-xyz.onrender.com)
       - key: VITE_API_URL
         fromService:
           type: web
           name: poker-api
-          property: url
+          property: host

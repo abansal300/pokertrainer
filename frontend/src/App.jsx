@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Upload, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 
 export default function App() {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  const API_HOST = import.meta.env.VITE_API_URL;
+  const API_URL = API_HOST ? `https://${API_HOST}` : 'http://localhost:8080';
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('idle'); 
   const [results, setResults] = useState([]); // Stores the calculated hands
