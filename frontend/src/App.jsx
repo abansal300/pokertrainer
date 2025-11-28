@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Upload, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 
 export default function App() {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('idle'); 
   const [results, setResults] = useState([]); // Stores the calculated hands
@@ -16,7 +17,7 @@ export default function App() {
       formData.append('file', file);
 
       // 1. Upload File
-      const response = await fetch('http://localhost:8080/api/upload', { method: 'POST', body: formData });
+      const response = await fetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error || 'Upload failed');
@@ -38,7 +39,7 @@ export default function App() {
     const interval = setInterval(async () => {
       // For each job, check if we already have the result. If not, fetch it.
       const updates = await Promise.all(jobIds.map(async (id) => {
-        const res = await fetch(`http://localhost:8080/api/results/${id}`);
+        const res = await fetch(`${API_URL}/api/results/${id}`);
         const json = await res.json();
         return json.status === 'completed' ? json.data : null;
       }));

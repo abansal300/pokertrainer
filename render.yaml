@@ -1,0 +1,53 @@
+services:
+  # 1. THE REDIS SERVICE
+  - type: redis
+    name: poker-redis
+    region: oregon
+    plan: free
+    ipAllowList: []
+
+  # 2. THE API SERVICE (Flask)
+  - type: web
+    name: poker-api
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: ./api 
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: poker-redis
+          property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: 1
+
+  # 3. THE WORKER SERVICE (Python)
+  - type: worker
+    name: poker-worker
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: ./worker
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: poker-redis
+          property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: 1
+
+  # 4. THE FRONTEND SERVICE (React)
+  - type: web
+    name: poker-frontend
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: ./frontend
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: poker-api
+          property: url

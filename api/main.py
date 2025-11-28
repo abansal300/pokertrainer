@@ -20,11 +20,20 @@ def initialize_redis():
     # Connects to redis
     global rdb
     try:
-        rdb = Redis(host='redis', port=6379, decode_responses=True)
+        # Check for the secure URL first (Render provides this)
+        redis_url = os.getenv('REDIS_URL')
+        
+        if redis_url:
+            rdb = Redis.from_url(redis_url, decode_responses=True)
+        else:
+            # Fallback to local Docker logic
+            redis_host = os.getenv('REDIS_ADDR', 'localhost:6379').split(':')[0]
+            rdb = Redis(host=redis_host, port=6379, decode_responses=True)
+            
         rdb.ping()
-        print("SUCCESS: Connected to Redis")
+        print("SUCCESS: Connected to Redis Queue.")
     except Exception as e:
-        print(f"FATAL: Could not connect to redis: {e}")
+        print(f"FATAL: Could not connect to Redis: {e}")
 
 with app.app_context():
     initialize_redis()

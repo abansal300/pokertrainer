@@ -146,9 +146,20 @@ def parse_card_string(card_str):
     if len(card_str) != 2: return None
     return (card_str[0], card_str[1])
 
-REDIS_ADDR = os.getenv('REDIS_ADDR', 'localhost:6379')
 QUEUE_NAME = 'analysis_jobs'
-rdb = Redis(host='redis', port=6379, decode_responses=True)
+
+try:
+    redis_url = os.getenv('REDIS_URL')
+    if redis_url:
+        rdb = Redis.from_url(redis_url, decode_responses=True)
+    else:
+        redis_host = os.getenv('REDIS_ADDR', 'localhost:6379').split(':')[0]
+        rdb = Redis(host=redis_host, port=6379, decode_responses=True)
+        
+    rdb.ping()
+    print("WORKER: Connected to Redis Queue.")
+except Exception as e:
+    print(f"WORKER FATAL: Could not connect to Redis: {e}")
 
 def start_worker():
     print("WORKER: Listening for jobs...")
