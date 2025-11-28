@@ -35,50 +35,54 @@ def status_check():
     return jsonify({"status": "ok", "service": "API Gateaway", "queue": QUEUE_NAME})
 
 # 3. Main Ingestion Endpoint
-@app.route('/api/upload', methods = ["POST"])
+@app.route('/api/upload', methods=['POST'])
 def upload_handler():
-    
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part in the request."}), 400
-
+    # ... (Keep existing validation logic) ...
+    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
     uploaded_file = request.files['file']
-
-    if uploaded_file.filename == '':
-        return jsonify({"error": "No file selected."}), 400
-
+    if uploaded_file.filename == '': return jsonify({"error": "Empty filename"}), 400
     raw_content = uploaded_file.read().decode('utf-8')
-
-    # 1. parse the hands
     job_payloads = parse_hand_history(raw_content)
-
-    if not job_payloads:
-        return jsonify({"error": "No valid hands found in the file."}), 400
+    if not job_payloads: return jsonify({"error": "No hands found"}), 400
     
-    # 2. enqueue the jobs
     pushed_count = 0
-
+    job_ids = [] # <--- NEW: Track generated IDs
+    
     try:
         pipe = rdb.pipeline()
-
         for payload in job_payloads:
             job_id = str(uuid.uuid4())
-            payload['job_id'] = job_id
-
+            payload["job_id"] = job_id
+            
+            job_ids.append(job_id) # <--- NEW: Add to list
+            
             pipe.lpush(QUEUE_NAME, json.dumps(payload))
             pushed_count += 1
-
-        pipe.execute()
-
-        return jsonify({
-            "status": "Accepted for Processing",
-            "total_hands_found": len(job_payloads),
-            "total_jobs_queued": pushed_count,
-            "message": "Jobs queued successfully. Processing in the background."
-        }), 202
-    except Exception as e:
-        return jsonify({"error": f"Failed to queue jobs to Redis: {e}"}), 500
         
+        pipe.execute()
+        
+        return jsonify({
+            "status": "Accepted",
+            "total_jobs": pushed_count,
+            "job_ids": job_ids, # <--- NEW: Return this list to Frontend
+            "message": "Jobs queued."
+        }), 202
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/results/<job_id>', methods=['GET'])
+def result_handler(job_id):
+    # Check Redis for the result stored by the Worker
+    result_key = f"result:{job_id}"
+    data = rdb.get(result_key)
+    
+    if not data:
+        # If no data exists yet, the worker is still thinking
+        return jsonify({"status": "pending"}), 202
+    
+    # If data exists, return it
+    return jsonify({"status": "completed", "data": json.loads(data)}), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=True)

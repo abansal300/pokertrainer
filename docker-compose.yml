@@ -52,6 +52,17 @@ services:
       replicas: 2
     networks:
       - poker-net
+  
+  # SERVICE 5: The React Frontend
+  frontend:
+    build: ./frontend
+    container_name: poker_frontend
+    ports:
+      - "3000:80" # Map localhost:3000 to Nginx port 80
+    depends_on:
+      - api
+    networks:
+      - poker-net
 
 networks:
   poker-net:
