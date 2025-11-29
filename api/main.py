@@ -4,8 +4,18 @@ import uuid
 import re
 
 from flask import Flask, request, jsonify
+from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from redis import Redis
+
+import psycopg2
+
+import hashlib
+
+DB_HOST = os.getenv('DB_ADDR', 'localhost:5432').split(':')[0]
+DB_NAME = 'poker_stats'
+DB_USER = 'user'
+DB_PASSWORD = 'password'
 
 # 1. Configuration
 REDIS_ADDR = os.getenv("REDIS_ADDR", "localhost:6379")
@@ -13,6 +23,8 @@ QUEUE_NAME = "analysis_jobs"
 
 app = Flask(__name__)
 CORS(app)
+
+socketio = SocketIO(app, cors_allowed_origins="*", message_queue=os.environ.get('REDIS_URL', 'redis://redis:6379/0'))
 
 rdb = None
 
@@ -37,6 +49,51 @@ def initialize_redis():
 
 with app.app_context():
     initialize_redis()
+
+def create_cache_key(hero_hand_strs: list, board_strs: list) -> str:
+    """Creates a unique, deterministic key for the hand combination."""
+    # 1. Combine all cards
+    all_cards = hero_hand_strs + board_strs
+    # 2. Sort them alphabetically (Canonical form)
+    all_cards.sort()
+    # 3. Create a clean, unique string
+    key_string = ":".join(all_cards)
+    # 4. Hash the string to create a compact key
+    return hashlib.sha256(key_string.encode('utf-8')).hexdigest()
+
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    try:
+        conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASSWORD)
+        cursor = conn.cursor()
+        
+        # Select all hands, ordered by when they were processed
+        cursor.execute("""
+            SELECT hand_id, hero_hand, board, equity, 
+                   TO_CHAR(processed_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS processed_at 
+            FROM hands_analysis ORDER BY processed_at DESC
+        """)
+        
+        # Get column names for building the JSON response
+        columns = [desc[0] for desc in cursor.description]
+        
+        # Convert all results to a list of dictionaries
+        history = [
+            dict(zip(columns, row))
+            for row in cursor.fetchall()
+        ]
+        
+        cursor.close()
+        conn.close()
+
+        for item in history:
+            item['equity'] = float(item['equity'])
+
+        return jsonify({"status": "success", "history": history}), 200
+
+    except Exception as e:
+        print(f"API ERROR: Database query failed: {e}")
+        return jsonify({"error": f"Database query failed: {e}"}), 500
 
 # 2. Status Check Endpoint
 @app.route("/", methods = ["GET"])
@@ -94,7 +151,11 @@ def result_handler(job_id):
     return jsonify({"status": "completed", "data": json.loads(data)}), 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    import eventlet
+    eventlet.monkey_patch()
+
+    print("Starting SocketIO server...")
+    socketio.run(app, host='0.0.0.0', port=8080, debug=True)
 
 # 4. Parser Logic
 def parse_hand_history(raw_content: str) -> list:
